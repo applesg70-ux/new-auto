@@ -262,9 +262,14 @@ async function loadChat() {
   try {
     const data = await api('/api/chat/messages');
     const box = document.getElementById('chat-messages');
-    box.innerHTML = (data.messages || []).map(m => 
-      `<div style="margin:5px 0;text-align:${m.from==='user'?'right':'left'};"><span style="background:${m.from==='user'?'#3b82f6':'#334155'};padding:6px 10px;border-radius:8px;display:inline-block;">${m.message}</span></div>`
-    ).join('');
+    box.innerHTML = (data.messages || []).map(m => {
+      const isUser = m.from === 'user';
+      const isSystem = m.from === 'system';
+      const align = isUser ? 'right' : 'left';
+      const bg = isUser ? '#3b82f6' : isSystem ? '#f59e0b' : '#334155';
+      const label = isSystem ? '' : (isUser ? 'You' : (m.supportName || 'Support'));
+      return `<div style="margin:5px 0;text-align:${align};"><small style="opacity:0.7;">${label}</small><br><span style="background:${bg};padding:6px 10px;border-radius:8px;display:inline-block;">${m.message}</span></div>`;
+    }).join('');
     box.scrollTop = box.scrollHeight;
   } catch(e) {}
 }

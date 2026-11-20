@@ -20,6 +20,7 @@ let db = {
   activities: [],
   messages: [],
   supportOnline: true,
+  supportName: 'Customer Support',
   admin: {
     username: 'admin',
     passwordHash: hashPassword('admin123') // Change this via admin panel!
@@ -479,20 +480,41 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/admin/chat/reply' && method === 'POST') {
       if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
-      const { userId, message } = body;
+      const { userId, message, supportName } = body;
       if (!message || !userId) return sendJSON(res, 400, { error: 'Missing data' });
       const user = db.users.find(u => u.id === userId);
+      const nameToUse = supportName || db.supportName || 'Customer Support';
       db.messages.push({
         id: crypto.randomUUID(),
         userId,
         userName: user ? user.name : 'User',
         message,
         from: 'admin',
+        supportName: nameToUse,
+        time: new Date().toISOString(),
+        read: false
+      });
+      // Join notification
+      db.messages.push({
+        id: crypto.randomUUID(),
+        userId,
+        userName: user ? user.name : 'User',
+        message: `${nameToUse} has joined the chat`,
+        from: 'system',
+        supportName: nameToUse,
         time: new Date().toISOString(),
         read: false
       });
       saveDB();
       return sendJSON(res, 200, { success: true });
+    }
+
+    if (pathname === '/api/admin/set-support-name' && method === 'POST') {
+      if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
+      const { name } = body;
+      if (name) db.supportName = name;
+      saveDB();
+      return sendJSON(res, 200, { success: true, supportName: db.supportName });
     }
 
     // Wallet link for stage reward (requires KYC)

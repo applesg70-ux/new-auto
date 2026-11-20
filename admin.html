@@ -38,13 +38,13 @@
         <h2>Users</h2>
         <div id="users-table"></div>
 
-        <h2>Live Chat Messages</h2>
-        <div id="admin-chat"></div>
-        <div id="chat-reply" style="margin:20px 0;display:none;">
-            <input id="reply-userid" placeholder="User ID">
-            <input id="reply-msg" placeholder="Reply message">
-            <button onclick="sendReply()">Send Reply</button>
+        <h2>Live Support Chats</h2>
+        <div style="margin-bottom:15px;">
+            <input id="support-name-input" placeholder="Your support name (shown to users)" value="Customer Support" style="width:300px;">
+            <button onclick="setSupportName()">Set Support Name</button>
         </div>
+        <div id="admin-chat-list"></div>
+        <div id="chat-windows" style="display:flex;flex-wrap:wrap;gap:15px;margin-top:20px;"></div>
 
         <h2>Recent Activities</h2>
         <div id="activities"></div>
@@ -139,15 +139,84 @@
             document.getElementById('chat-reply').style.display = 'block';
         }
 
-        async function sendReply() {
-            const userId = document.getElementById('reply-userid').value.trim();
-            const message = document.getElementById('reply-msg').value.trim();
-            if (!userId || !message) return alert('Enter User ID and message');
-            await api('/api/admin/chat/reply', { method: 'POST', body: JSON.stringify({ userId, message }) });
-            alert('Reply sent');
-            document.getElementById('reply-msg').value = '';
-            loadAdminChat();
+        let openChats = {};
+
+        async function setSupportName() {
+            const name = document.getElementById('support-name-input').value.trim();
+            if (!name) return;
+            await api('/api/admin/set-support-name', { method: 'POST', body: JSON.stringify({ name }) });
+            alert('Support name set to: ' + name);
         }
+
+        async function loadAdminChat() {
+            const data = await api('/api/admin/chat/messages');
+            const msgs = data.messages || [];
+            const byUser = {};
+            msgs.forEach(m => {
+                if (!byUser[m.userId]) byUser[m.userId] = [];
+                byUser[m.userId].push(m);
+            });
+            let html = '<table><tr><th>User</th><th>Last Message</th><th>Action</th></tr>';
+            Object.keys(byUser).forEach(uid => {
+                const last = byUser[uid][0];
+                html += `<tr>
+                    <td>${last.userName || 'User'} (${uid.slice(0,8)})</td>
+                    <td>${(last.message || '').substring(0,40)}...</td>
+                    <td><button onclick="openChatWindow('${uid}', '${(last.userName||'User').replace(/'/g,"")}')">Reply</button></td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('admin-chat-list').innerHTML = html;
+        }
+
+        function openChatWindow(userId, userName) {
+            if (openChats[userId]) return;
+            const win = document.createElement('div');
+            win.id = 'chat-win-' + userId;
+            win.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:8px;width:320px;height:400px;display:flex;flex-direction:column;padding:10px;';
+            win.innerHTML = `
+                <div style="display:flex;justify-content:space-between;"><strong>Chat with ${userName}</strong><button onclick="closeChat('${userId}')">✕</button></div>
+                <div id="msgs-${userId}" style="flex:1;overflow-y:auto;background:#0f172a;margin:8px 0;padding:8px;border-radius:6px;font-size:0.9rem;"></div>
+                <input id="input-${userId}" placeholder="Type reply..." style="margin:0;">
+                <button onclick="sendChatReply('${userId}')">Send</button>
+            `;
+            document.getElementById('chat-windows').appendChild(win);
+            openChats[userId] = true;
+            loadChatWindow(userId);
+        }
+
+        function closeChat(userId) {
+            const el = document.getElementById('chat-win-' + userId);
+            if (el) el.remove();
+            delete openChats[userId];
+        }
+
+        async function loadChatWindow(userId) {
+            const data = await api('/api/admin/chat/messages');
+            const userMsgs = (data.messages || []).filter(m => m.userId === userId).reverse();
+            const box = document.getElementById('msgs-' + userId);
+            if (!box) return;
+            box.innerHTML = userMsgs.map(m => {
+                const isAdmin = m.from === 'admin';
+                const isSystem = m.from === 'system';
+                return `<div style="margin:4px 0;text-align:${isAdmin?'right':'left'};"><small>${isSystem?'System':(isAdmin?(m.supportName||'You'):'User')}</small><br><span style="background:${isAdmin?'#3b82f6':isSystem?'#f59e0b':'#334155'};padding:4px 8px;border-radius:6px;display:inline-block;">${m.message}</span></div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendChatReply(userId) {
+            const input = document.getElementById('input-' + userId);
+            const message = input.value.trim();
+            if (!message) return;
+            const supportName = document.getElementById('support-name-input').value.trim() || 'Customer Support';
+            await api('/api/admin/chat/reply', { method: 'POST', body: JSON.stringify({ userId, message, supportName }) });
+            input.value = '';
+            loadChatWindow(userId);
+        }
+
+        setInterval(() => {
+            Object.keys(openChats).forEach(uid => loadChatWindow(uid));
+        }, 3000);
 
         async function changeAdminPassword() {
             const newPass = prompt('Enter new admin password (min 6 characters):');
