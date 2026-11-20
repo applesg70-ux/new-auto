@@ -760,6 +760,9 @@ const server = http.createServer(async (req, res) => {
       saveDB();
       return sendJSON(res, 200, { success: true, file: `/uploads/${safeName}` });
     }
+
+    // Set VIP
+    if (pathname === '/api/admin/set-vip' && method === 'POST') {
       if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
       const { userId, isVIP } = body;
       const user = db.users.find(u => u.id === userId);
