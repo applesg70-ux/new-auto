@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automarin World Cars | Chinese & American Autos Collaboration</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-car"></i> Automarin <span>World Cars</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#cars">Cars</a></li>
+                <li><a href="#earn">Earn & Review</a></li>
+                <li><a href="#about">About</a></li>
+                <li id="auth-nav"><a href="#" onclick="showAuth('login')">Login</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </nav>
+
+    <header id="home" class="hero">
+        <div class="hero-content">
+            <h1>Chinese & American Autos Meet Automarin</h1>
+            <p class="subtitle">Exclusive Collaboration at Automarin - Μεταχειρισμένα Αυτοκίνητα Λ. Αλεξάνδρας, Athens</p>
+            <p>Discover the best of both worlds. Sign up, explore premium Chinese electric vehicles and iconic American models, leave reviews, and earn rewards!</p>
+            <div class="cta-buttons">
+                <button class="btn-primary" onclick="scrollToCars()">Explore Cars</button>
+                <button class="btn-secondary" onclick="showAuth('signup')">Join & Earn $30</button>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="27giT.jpg" alt="Modern Dealership">
+        </div>
+    </header>
+
+    <section id="earn" class="earn-section">
+        <div class="container">
+            <h2>How to Earn with Reviews</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-icon">1</div>
+                    <h3>Sign Up</h3>
+                    <p>Create your free account to join the platform.</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">2</div>
+                    <h3>Click & Review</h3>
+                    <p>Click on at least 30 cars. Each click earns $1. Cooldown: 3-5 minutes between clicks.</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">3</div>
+                    <h3>Link Wallet</h3>
+                    <p>After 30 successful clicks, link your digital wallet address.</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">4</div>
+                    <h3>Withdraw $30</h3>
+                    <p>Receive your $30 thank-you reward. Need help? Contact support.</p>
+                </div>
+            </div>
+            <div class="user-status" id="user-status" style="display:none;">
+                <h3>Your Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <p id="progress-text">0 / 30 clicks | Earnings: $0</p>
+                <button id="withdraw-btn" class="btn-primary" style="display:none;" onclick="showWithdraw()">Withdraw $30</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="cars" class="cars-section">
+        <div class="container">
+            <h2>Featured Chinese & American Cars</h2>
+            <p class="section-subtitle">Available for review at our Automarin Alexandras collaboration</p>
+            <div class="car-grid" id="car-grid">
+                <!-- Cars populated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <section id="about" class="about-section">
+        <div class="container">
+            <h2>About the Collaboration</h2>
+            <p>Automarin, Greece’s leading used car dealership with over 40 years of experience, has partnered with Chinese electric innovators (BYD, MG, Chery and more) and American auto icons (Ford, Tesla, Jeep) to bring the global car world to Athens.</p>
+            <p>Visit us at Λ. Αλεξάνδρας (Leoforos Alexandras), Athens. Experience premium pre-owned and new arrivals with full after-sales support.</p>
+            <div class="contact-info">
+                <p><i class="fas fa-map-marker-alt"></i> Automarin - Μεταχειρισμένα Αυτοκίνητα Λ. Αλεξάνδρας, Athens, Greece</p>
+                <p><i class="fas fa-globe"></i> <a href="https://www.automarin.gr" target="_blank">www.automarin.gr</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('auth-modal')">&times;</span>
+            <div id="login-form">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
+                <button onclick="login()">Login</button>
+                <p>No account? <a href="#" onclick="showAuth('signup')">Sign Up</a></p>
+            </div>
+            <div id="signup-form" style="display:none;">
+                <h2>Sign Up</h2>
+                <input type="text" id="signup-name" placeholder="Full Name">
+                <input type="email" id="signup-email" placeholder="Email">
+                <input type="password" id="signup-password" placeholder="Password">
+                <button onclick="signup()">Create Account</button>
+                <p>Already have an account? <a href="#" onclick="showAuth('login')">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="modal">
+        <div class="modal-content review-content">
+            <span class="close" onclick="closeModal('review-modal')">&times;</span>
+            <img id="review-car-img" src="" alt="">
+            <h2 id="review-car-name"></h2>
+            <p id="review-car-details"></p>
+            <textarea id="review-text" placeholder="Leave your review about this car..." rows="4"></textarea>
+            <button id="submit-review" onclick="submitReview()">Submit Review & Earn $1</button>
+            <p id="cooldown-msg" class="cooldown"></p>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div id="withdraw-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('withdraw-modal')">&times;</span>
+            <h2>Withdraw Your $30 Reward</h2>
+            <p>Congratulations on completing 30 reviews! Link your digital wallet to receive $30.</p>
+            <input type="text" id="wallet-address" placeholder="Enter your digital wallet address (e.g. USDT, BTC, ETH)">
+            <button onclick="linkWallet()">Link Wallet & Request Withdrawal</button>
+            <div id="withdraw-status"></div>
+            <hr>
+            <h3>Need Help?</h3>
+            <p>If you are finding it difficult to withdraw your funds, click the button below to contact customer support.</p>
+            <button class="btn-support" onclick="contactSupport()"><i class="fas fa-headset"></i> Customer Support</button>
+        </div>
+    </div>
+
+    <!-- Support Modal -->
+    <div id="support-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('support-modal')">&times;</span>
+            <h2>Customer Support</h2>
+            <p>Our team is here to help with your withdrawal or any platform questions.</p>
+            <p><strong>Email:</strong> support@automarinworldcars.gr</p>
+            <p><strong>WhatsApp:</strong> +30 210 646 1737</p>
+            <p><strong>Hours:</strong> Mon-Fri 9:00-20:00, Sat 9:00-16:00</p>
+            <textarea id="support-message" placeholder="Describe your issue..." rows="4"></textarea>
+            <button onclick="sendSupport()">Send Message</button>
+            <p id="support-sent"></p>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Automarin World Cars | Collaboration with Automarin - Μεταχειρισμένα Αυτοκίνητα Λ.Αλεξάνδρας</p>
+            <p>Promotional platform for car reviews and engagement. Rewards are thank-you bonuses for participation.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
