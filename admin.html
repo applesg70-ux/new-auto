@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Automarin World Cars</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+        h1 { color: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; border: 1px solid #334155; text-align: left; }
+        th { background: #1e293b; }
+        button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin: 2px; }
+        button.danger { background: #ef4444; }
+        button.success { background: #10b981; }
+        .login-box { max-width: 400px; margin: 100px auto; background: #1e293b; padding: 30px; border-radius: 12px; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="login-section" class="login-box">
+        <h1>Admin Login</h1>
+        <input id="admin-user" placeholder="Username">
+        <input id="admin-pass" type="password" placeholder="Password">
+        <button onclick="adminLogin()">Login</button>
+    </div>
+
+    <div id="admin-panel" class="hidden">
+        <h1>Automarin World Cars - Admin Control Panel</h1>
+        <p>Full control: approve registrations, edit users, approve payments, view activity.</p>
+        <button onclick="loadUsers()">Refresh Users</button>
+        <button onclick="loadActivities()">View Recent Activity</button>
+        <button onclick="loadAdminChat()">View Live Chat</button>
+        <button onclick="toggleSupport()">Toggle Support Online/Offline</button>
+        <button onclick="changeAdminPassword()">Change Admin Password</button>
+        <button onclick="logout()">Logout</button>
+
+        <h2>Users</h2>
+        <div id="users-table"></div>
+
+        <h2>Live Chat Messages</h2>
+        <div id="admin-chat"></div>
+        <div id="chat-reply" style="margin:20px 0;display:none;">
+            <input id="reply-userid" placeholder="User ID">
+            <input id="reply-msg" placeholder="Reply message">
+            <button onclick="sendReply()">Send Reply</button>
+        </div>
+
+        <h2>Recent Activities</h2>
+        <div id="activities"></div>
+    </div>
+
+    <script>
+        let adminToken = null;
+
+        async function api(path, options = {}) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+            const res = await fetch(path, { ...options, headers });
+            return res.json();
+        }
+
+        async function adminLogin() {
+            const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({
+                username: document.getElementById('admin-user').value,
+                password: document.getElementById('admin-pass').value
+            })});
+            if (data.token) {
+                adminToken = data.token;
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('admin-panel').classList.remove('hidden');
+                loadUsers();
+            } else {
+                alert(data.error || 'Login failed');
+            }
+        }
+
+        async function loadUsers() {
+            const data = await api('/api/admin/users');
+            const users = data.users || [];
+            let html = '<table><tr><th>Name</th><th>Email</th><th>Approved</th><th>Stage</th><th>Progress</th><th>Earnings</th><th>Actions</th></tr>';
+            users.forEach(u => {
+                html += `<tr>
+                    <td>${u.name}</td>
+                    <td>${u.email}</td>
+                    <td>${u.approved ? 'Yes' : 'No'}</td>
+                    <td>${u.stage}</td>
+                    <td>${JSON.stringify(u.stageProgress)}</td>
+                    <td>$${u.earnings}</td>
+                    <td>
+                        <button class="success" onclick="approveUser('${u.id}', true)">Approve</button>
+                        <button class="danger" onclick="approveUser('${u.id}', false)">Reject</button>
+                        <button onclick="editUser('${u.id}')">Edit</button>
+                        <button onclick="approveAllRewards('${u.id}')">Approve Rewards</button>
+                        <button onclick="verifyKYC('${u.id}', true)">Verify KYC</button>
+                        <button onclick="setVIP('${u.id}', true)">Set VIP</button>
+                        <button onclick="approveReset('${u.id}')">Approve Password Reset</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('users-table').innerHTML = html;
+        }
+
+        async function approveUser(id, approved) {
+            await api('/api/admin/user', { method: 'PUT', body: JSON.stringify({ id, approved }) });
+            loadUsers();
+        }
+
+        async function editUser(id) {
+            const stage = prompt('Set stage (1-5):');
+            const earnings = prompt('Set earnings amount:');
+            if (stage || earnings) {
+                await api('/api/admin/user', { method: 'PUT', body: JSON.stringify({
+                    id,
+                    stage: stage ? parseInt(stage) : undefined,
+                    earnings: earnings ? parseFloat(earnings) : undefined
+                })});
+                loadUsers();
+            }
+        }
+
+        async function approveAllRewards(userId) {
+            for (let s = 1; s <= 5; s++) {
+                await api('/api/admin/approve-reward', { method: 'POST', body: JSON.stringify({ userId, stage: s }) });
+            }
+            alert('All pending rewards marked as approved');
+            loadUsers();
+        }
+
+        async function loadAdminChat() {
+            const data = await api('/api/admin/chat/messages');
+            let html = '<table><tr><th>Time</th><th>User</th><th>From</th><th>Message</th></tr>';
+            (data.messages || []).forEach(m => {
+                html += `<tr><td>${m.time}</td><td>${m.userName} (${m.userId.slice(0,8)})</td><td>${m.from}</td><td>${m.message}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById('admin-chat').innerHTML = html;
+            document.getElementById('chat-reply').style.display = 'block';
+        }
+
+        async function sendReply() {
+            const userId = document.getElementById('reply-userid').value.trim();
+            const message = document.getElementById('reply-msg').value.trim();
+            if (!userId || !message) return alert('Enter User ID and message');
+            await api('/api/admin/chat/reply', { method: 'POST', body: JSON.stringify({ userId, message }) });
+            alert('Reply sent');
+            document.getElementById('reply-msg').value = '';
+            loadAdminChat();
+        }
+
+        async function changeAdminPassword() {
+            const newPass = prompt('Enter new admin password (min 6 characters):');
+            if (!newPass || newPass.length < 6) return alert('Password too short');
+            const data = await api('/api/admin/change-password', { method: 'POST', body: JSON.stringify({ newPassword: newPass }) });
+            alert(data.message || 'Password changed');
+        }
+
+        async function toggleSupport() {
+            const data = await api('/api/admin/toggle-support', { method: 'POST' });
+            alert('Support is now ' + (data.online ? 'ONLINE' : 'OFFLINE'));
+        }
+
+        async function verifyKYC(id, verified) {
+            await api('/api/admin/verify-kyc', { method: 'POST', body: JSON.stringify({ userId: id, verified }) });
+            alert('KYC updated');
+            loadUsers();
+        }
+
+        async function setVIP(id, isVIP) {
+            await api('/api/admin/set-vip', { method: 'POST', body: JSON.stringify({ userId: id, isVIP }) });
+            alert('VIP status updated');
+            loadUsers();
+        }
+
+        async function approveReset(id) {
+            const newPass = prompt('Set new password for this user (or leave blank to just clear request):');
+            await api('/api/admin/approve-reset', { method: 'POST', body: JSON.stringify({ userId: id, newPassword: newPass || undefined }) });
+            alert('Password reset approved');
+            loadUsers();
+        }
+
+        async function loadActivities() {
+            const data = await api('/api/admin/activities');
+            let html = '<table><tr><th>Time</th><th>User</th><th>Type</th><th>Details</th></tr>';
+            (data.activities || []).forEach(a => {
+                html += `<tr><td>${a.time}</td><td>${a.userId.slice(0,8)}...</td><td>${a.type}</td><td>${JSON.stringify(a)}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById('activities').innerHTML = html;
+        }
+
+        function logout() {
+            adminToken = null;
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('admin-panel').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

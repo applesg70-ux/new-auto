@@ -160,21 +160,24 @@ function serveStatic(req, res) {
   let cleanUrl = req.url.split('?')[0];
   if (cleanUrl === '/' || cleanUrl === '') cleanUrl = '/index.html';
 
+  // Special case for admin
+  if (cleanUrl === '/admin' || cleanUrl === '/admin/') cleanUrl = '/admin.html';
+
   // Try public folder first
   let filePath = path.join(PUBLIC_DIR, cleanUrl);
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  if (!filePath.startsWith(PUBLIC_DIR) && !filePath.startsWith(__dirname)) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
 
-  // Fallback: look in the root directory if not found in public
+  // Fallback to root directory
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(__dirname, cleanUrl);
+    filePath = path.join(__dirname, cleanUrl.replace(/^\//, ''));
   }
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     const types = {
-      '.html': 'text/html',
+      '.html': 'text/html; charset=utf-8',
       '.css': 'text/css',
       '.js': 'application/javascript',
       '.jpg': 'image/jpeg',
@@ -187,7 +190,7 @@ function serveStatic(req, res) {
     res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
     fs.createReadStream(filePath).pipe(res);
   } else {
-    console.log('File not found:', filePath);
+    console.log('404 - File not found:', filePath, 'for URL:', req.url);
     res.writeHead(404); res.end('Not found');
   }
 }
