@@ -221,6 +221,8 @@ function serveStatic(req, res) {
   // Special case for admin
   if (cleanUrl === '/admin' || cleanUrl === '/admin/') cleanUrl = '/admin.html';
 
+  let filePath;
+
   // Special case for uploads
   if (cleanUrl.startsWith('/uploads/')) {
     filePath = path.join(__dirname, cleanUrl);
