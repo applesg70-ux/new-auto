@@ -724,6 +724,19 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { success: true });
     }
 
+    // Admin ban and permanently delete user
+    if (pathname === '/api/admin/ban-delete' && method === 'POST') {
+      if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
+      const { userId } = body;
+      const idx = db.users.findIndex(u => u.id === userId);
+      if (idx === -1) return sendJSON(res, 404, { error: 'User not found' });
+      db.users.splice(idx, 1);
+      db.sessions = db.sessions.filter(s => s.userId !== userId);
+      db.messages = db.messages.filter(m => m.userId !== userId);
+      saveDB();
+      return sendJSON(res, 200, { success: true, message: 'User banned and account deleted' });
+    }
+
     // Chat file upload (base64 for simplicity on pure Node)
     if (pathname === '/api/chat/upload' && method === 'POST') {
       if (!currentUser) return sendJSON(res, 401, { error: 'Unauthorized' });

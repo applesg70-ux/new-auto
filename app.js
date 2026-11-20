@@ -106,18 +106,20 @@ function updateUI() {
   if (currentUser) {
     authNav.innerHTML = `<a href="#" onclick="logout()">Logout (${currentUser.name})</a>`;
     if (currentUser.restricted) {
-      if (banner) {
-        banner.style.display = 'block';
-        document.getElementById('restriction-msg').textContent = currentUser.restrictionMessage || 'Please contact support via chat.';
+      const overlay = document.getElementById('restricted-overlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        const detail = document.getElementById('restriction-detail');
+        if (detail && currentUser.restrictionMessage) detail.textContent = currentUser.restrictionMessage;
       }
-      status.style.display = 'none';
-      const cars = document.getElementById('cars');
-      if (cars) { cars.style.opacity = '0.5'; cars.style.pointerEvents = 'none'; }
+      // Hide main content
+      document.querySelectorAll('nav, header, section, footer').forEach(el => el.style.display = 'none');
+      return;
     } else {
-      if (banner) banner.style.display = 'none';
-      status.style.display = 'block';
-      const cars = document.getElementById('cars');
-      if (cars) { cars.style.opacity = '1'; cars.style.pointerEvents = 'auto'; }
+      const overlay = document.getElementById('restricted-overlay');
+      if (overlay) overlay.style.display = 'none';
+      document.querySelectorAll('nav, header, section, footer').forEach(el => el.style.display = '');
+    }
       const stage = currentUser.stage || 1;
       document.getElementById('current-stage').textContent = stage;
       const prog = currentUser.stageProgress[stage] || 0;

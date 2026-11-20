@@ -9,9 +9,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div id="restriction-banner" style="display:none;background:#ef4444;color:white;padding:12px;text-align:center;font-weight:500;">
-        Your account is restricted. <span id="restriction-msg"></span> Please use the chat button to contact support.
+    <!-- Restricted Account Overlay -->
+    <div id="restricted-overlay" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:99998;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px;">
+        <h1 style="color:#ef4444;font-size:2rem;margin-bottom:1rem;">Your account has been Restricted</h1>
+        <p style="color:#e2e8f0;font-size:1.2rem;max-width:500px;">Contact customer support using the chat button below. We will review your case and either restore or permanently ban the account.</p>
+        <p id="restriction-detail" style="color:#f59e0b;margin-top:1rem;"></p>
     </div>
+
+    <div id="restriction-banner" style="display:none;"></div>
 
     <nav class="navbar">
         <div class="nav-container">

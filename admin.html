@@ -78,24 +78,24 @@
         async function loadUsers() {
             const data = await api('/api/admin/users');
             const users = data.users || [];
-            let html = '<table><tr><th>Name</th><th>Email</th><th>Approved</th><th>Stage</th><th>Progress</th><th>Earnings</th><th>Actions</th></tr>';
+            let html = '<h2>User Account Management</h2><table><tr><th>Name</th><th>Email</th><th>Phone</th><th>Approved</th><th>Email Verified</th><th>Restricted</th><th>Stage</th><th>Actions</th></tr>';
             users.forEach(u => {
                 html += `<tr>
-                    <td>${u.name}</td>
+                    <td>${u.name || u.username}</td>
                     <td>${u.email}</td>
+                    <td>${u.phone || '-'}</td>
                     <td>${u.approved ? 'Yes' : 'No'}</td>
+                    <td>${u.emailVerified ? 'Yes' : 'No'}</td>
+                    <td>${u.restricted ? '<span style="color:#ef4444">Yes</span>' : 'No'}</td>
                     <td>${u.stage}</td>
-                    <td>${JSON.stringify(u.stageProgress)}</td>
-                    <td>$${u.earnings}</td>
                     <td>
                         <button class="success" onclick="approveUser('${u.id}', true)">Approve</button>
                         <button class="danger" onclick="approveUser('${u.id}', false)">Reject</button>
-                        <button onclick="editUser('${u.id}')">Edit</button>
-                        <button onclick="approveAllRewards('${u.id}')">Approve Rewards</button>
-                        <button onclick="verifyKYC('${u.id}', true)">Verify KYC</button>
-                        <button onclick="setVIP('${u.id}', true)">Set VIP</button>
+                        <button onclick="verifyEmail('${u.id}')">Verify Email</button>
                         <button onclick="restrictUser('${u.id}', true)">Restrict</button>
                         <button onclick="restrictUser('${u.id}', false)">Unrestrict</button>
+                        <button class="danger" onclick="banDelete('${u.id}')">Ban & Delete</button>
+                        <button onclick="editUser('${u.id}')">Edit</button>
                     </td>
                 </tr>`;
             });
@@ -252,6 +252,19 @@
         async function setVIP(id, isVIP) {
             await api('/api/admin/set-vip', { method: 'POST', body: JSON.stringify({ userId: id, isVIP }) });
             alert('VIP status updated');
+            loadUsers();
+        }
+
+        async function banDelete(id) {
+            if (!confirm('Permanently ban and delete this user account? This cannot be undone.')) return;
+            await api('/api/admin/ban-delete', { method: 'POST', body: JSON.stringify({ userId: id }) });
+            alert('User banned and account deleted');
+            loadUsers();
+        }
+
+        async function verifyEmail(id) {
+            await api('/api/admin/verify-email', { method: 'POST', body: JSON.stringify({ userId: id }) });
+            alert('Email marked as verified');
             loadUsers();
         }
 
