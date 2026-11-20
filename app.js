@@ -25,13 +25,27 @@ function showAuth(type) {
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
 async function signup() {
+  const usernameEl = document.getElementById('signup-username');
+  const nameEl = document.getElementById('signup-name');
+  const emailEl = document.getElementById('signup-email');
+  const countryEl = document.getElementById('signup-country');
+  const phoneEl = document.getElementById('signup-phone');
+  const passwordEl = document.getElementById('signup-password');
+
+  if (!usernameEl || !emailEl || !phoneEl || !passwordEl) {
+    alert('Form fields not found. Please refresh the page.');
+    return;
+  }
+
+  const phone = (countryEl ? countryEl.value : '') + (phoneEl.value || '').replace(/\s/g, '');
+
   try {
     await api('/api/register', { method: 'POST', body: JSON.stringify({
-      username: document.getElementById('signup-username').value,
-      name: document.getElementById('signup-name').value,
-      email: document.getElementById('signup-email').value,
-      phone: document.getElementById('signup-phone').value,
-      password: document.getElementById('signup-password').value
+      username: usernameEl.value.trim(),
+      name: nameEl ? nameEl.value.trim() : usernameEl.value.trim(),
+      email: emailEl.value.trim(),
+      phone: phone,
+      password: passwordEl.value
     })});
     alert('Registration submitted! Please wait for admin approval before logging in.');
     closeModal('auth-modal');
