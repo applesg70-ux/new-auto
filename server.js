@@ -151,38 +151,46 @@ function destroySession(token) {
 }
 
 function sendVerificationEmail(email, token, name) {
-  const apiKey = process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY || 'b32d15bc0898c7ffc84cdeb4e0df9f5f56c162507169240685108b446d0f73e1-sbC3qkusXJw4SpZb';
+  const senderEmail = process.env.SENDER_EMAIL || 'applesg70@gmail.com';
+  const siteUrl = process.env.SITE_URL || 'https://new-auto-opq0.onrender.com';
+
   if (!apiKey) {
-    console.log('[Email] No API key. Verification link:', (process.env.SITE_URL || 'https://new-auto-gt53.onrender.com') + '/api/verify-email?token=' + token);
+    console.log('[Email] No API key. Verification link:', siteUrl + '/api/verify-email?token=' + token);
     return;
   }
-  const siteUrl = process.env.SITE_URL || 'https://new-auto-gt53.onrender.com';
+
   const verifyLink = `${siteUrl}/api/verify-email?token=${token}`;
-  const isBrevo = !!process.env.BREVO_API_KEY;
-  const payload = isBrevo ? {
-    sender: { name: 'Automarin World Cars', email: process.env.SENDER_EMAIL || 'noreply@automarinworldcars.com' },
+  const payload = {
+    sender: { name: 'Automarin World Cars', email: senderEmail },
     to: [{ email, name: name || email }],
     subject: 'Verify your email – Automarin World Cars',
-    htmlContent: `<p>Hello ${name || 'there'},</p><p>Please verify your email:</p><p><a href="${verifyLink}" style="background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Email</a></p><p>Link: ${verifyLink}</p>`
-  } : {
-    personalizations: [{ to: [{ email }] }],
-    from: { email: process.env.SENDER_EMAIL || 'noreply@automarinworldcars.com', name: 'Automarin World Cars' },
-    subject: 'Verify your email – Automarin World Cars',
-    content: [{ type: 'text/html', value: `<p>Hello,</p><p>Verify your email: <a href="${verifyLink}">${verifyLink}</a></p>` }]
+    htmlContent: `<p>Hello ${name || 'there'},</p><p>Thank you for registering on Automarin World Cars.</p><p>Please verify your email address to activate your account:</p><p><a href="${verifyLink}" style="background:#3b82f6;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold;">Verify Email</a></p><p>Or copy and paste this link into your browser:</p><p>${verifyLink}</p><p>If you did not register, you can safely ignore this email.</p><p>Best regards,<br>Automarin World Cars Team</p>`
   };
-  const options = isBrevo ? {
-    hostname: 'api.brevo.com', path: '/v3/smtp/email', method: 'POST',
-    headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
-  } : {
-    hostname: 'api.sendgrid.com', path: '/v3/mail/send', method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+
+  const options = {
+    hostname: 'api.brevo.com',
+    path: '/v3/smtp/email',
+    method: 'POST',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
   };
+
   const reqMail = https.request(options, (res) => {
     let data = '';
     res.on('data', c => data += c);
-    res.on('end', () => console.log(res.statusCode < 300 ? 'Email sent to ' + email : 'Email failed: ' + res.statusCode + ' ' + data));
+    res.on('end', () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        console.log('Verification email sent successfully to', email);
+      } else {
+        console.error('Brevo email failed:', res.statusCode, data);
+      }
+    });
   });
-  reqMail.on('error', e => console.error('Email error:', e));
+  reqMail.on('error', e => console.error('Email request error:', e));
   reqMail.write(JSON.stringify(payload));
   reqMail.end();
 }
