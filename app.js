@@ -265,10 +265,19 @@ async function loadChat() {
     box.innerHTML = (data.messages || []).map(m => {
       const isUser = m.from === 'user';
       const isSystem = m.from === 'system';
-      const align = isUser ? 'right' : 'left';
+      const align = isUser ? 'flex-end' : 'flex-start';
       const bg = isUser ? '#3b82f6' : isSystem ? '#f59e0b' : '#334155';
+      const avatar = isUser ? '👤' : isSystem ? '🔔' : '🎧';
       const label = isSystem ? '' : (isUser ? 'You' : (m.supportName || 'Support'));
-      return `<div style="margin:5px 0;text-align:${align};"><small style="opacity:0.7;">${label}</small><br><span style="background:${bg};padding:6px 10px;border-radius:8px;display:inline-block;">${m.message}</span></div>`;
+      return `
+        <div style="display:flex;justify-content:${align};margin:8px 0;align-items:flex-end;gap:8px;">
+          ${!isUser ? `<div style="width:32px;height:32px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:16px;">${avatar}</div>` : ''}
+          <div style="max-width:70%;">
+            ${label ? `<small style="opacity:0.7;display:block;margin-bottom:2px;">${label}</small>` : ''}
+            <span style="background:${bg};padding:8px 12px;border-radius:12px;display:inline-block;word-wrap:break-word;">${m.message}</span>
+          </div>
+          ${isUser ? `<div style="width:32px;height:32px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:16px;">${avatar}</div>` : ''}
+        </div>`;
     }).join('');
     box.scrollTop = box.scrollHeight;
   } catch(e) {}

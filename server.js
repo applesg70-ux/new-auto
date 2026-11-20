@@ -484,23 +484,28 @@ const server = http.createServer(async (req, res) => {
       if (!message || !userId) return sendJSON(res, 400, { error: 'Missing data' });
       const user = db.users.find(u => u.id === userId);
       const nameToUse = supportName || db.supportName || 'Customer Support';
+
+      // Only add the join message once per user chat
+      const alreadyJoined = db.messages.some(m => m.userId === userId && m.from === 'system' && m.message.includes('has joined'));
+      if (!alreadyJoined) {
+        db.messages.push({
+          id: crypto.randomUUID(),
+          userId,
+          userName: user ? user.name : 'User',
+          message: `${nameToUse} has joined the chat`,
+          from: 'system',
+          supportName: nameToUse,
+          time: new Date().toISOString(),
+          read: false
+        });
+      }
+
       db.messages.push({
         id: crypto.randomUUID(),
         userId,
         userName: user ? user.name : 'User',
         message,
         from: 'admin',
-        supportName: nameToUse,
-        time: new Date().toISOString(),
-        read: false
-      });
-      // Join notification
-      db.messages.push({
-        id: crypto.randomUUID(),
-        userId,
-        userName: user ? user.name : 'User',
-        message: `${nameToUse} has joined the chat`,
-        from: 'system',
         supportName: nameToUse,
         time: new Date().toISOString(),
         read: false
