@@ -94,7 +94,8 @@
                         <button onclick="approveAllRewards('${u.id}')">Approve Rewards</button>
                         <button onclick="verifyKYC('${u.id}', true)">Verify KYC</button>
                         <button onclick="setVIP('${u.id}', true)">Set VIP</button>
-                        <button onclick="approveReset('${u.id}')">Approve Password Reset</button>
+                        <button onclick="restrictUser('${u.id}', true)">Restrict</button>
+                        <button onclick="restrictUser('${u.id}', false)">Unrestrict</button>
                     </td>
                 </tr>`;
             });
@@ -251,6 +252,13 @@
         async function setVIP(id, isVIP) {
             await api('/api/admin/set-vip', { method: 'POST', body: JSON.stringify({ userId: id, isVIP }) });
             alert('VIP status updated');
+            loadUsers();
+        }
+
+        async function restrictUser(id, restricted) {
+            const message = restricted ? prompt('Restriction message for the user (they will see this):', 'Your account has been restricted. Please contact customer support via the chat button.') : '';
+            await api('/api/admin/restrict', { method: 'POST', body: JSON.stringify({ userId: id, restricted, message }) });
+            alert(restricted ? 'User restricted' : 'User unrestricted');
             loadUsers();
         }
 

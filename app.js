@@ -78,6 +78,9 @@ async function login() {
 }
 
 function logout() {
+  if (token) {
+    api('/api/logout', { method: 'POST' }).catch(() => {});
+  }
   token = null;
   currentUser = null;
   localStorage.removeItem('token');
@@ -99,31 +102,36 @@ async function loadMe() {
 function updateUI() {
   const authNav = document.getElementById('auth-nav');
   const status = document.getElementById('user-status');
+  const banner = document.getElementById('restriction-banner');
   if (currentUser) {
     authNav.innerHTML = `<a href="#" onclick="logout()">Logout (${currentUser.name})</a>`;
-    status.style.display = 'block';
-    const stage = currentUser.stage || 1;
-    document.getElementById('current-stage').textContent = stage;
-    const prog = currentUser.stageProgress[stage] || 0;
-    const required = [0,30,20,15,1,1][stage] || 30;
-    const percent = Math.min(100, (prog / required) * 100);
-    document.getElementById('progress').style.width = percent + '%';
-    document.getElementById('progress-text').textContent = `Stage ${stage}: ${prog} / ${required}`;
-    document.getElementById('earnings-text').textContent = `Total earnings so far: $${currentUser.earnings || 0} (pending admin approval)`;
-    document.getElementById('next-stage-btn').style.display = (prog >= required && stage < 5) ? 'inline-block' : 'none';
-    // Show withdraw if stage just completed
-    if (prog >= required) {
-      const wbtn = document.getElementById('withdraw-stage-btn') || document.createElement('button');
-      wbtn.id = 'withdraw-stage-btn';
-      wbtn.className = 'btn-primary';
-      wbtn.style.marginTop = '10px';
-      wbtn.textContent = `Withdraw Stage ${stage} Reward`;
-      wbtn.onclick = () => showWithdraw(stage);
-      if (!document.getElementById('withdraw-stage-btn')) document.getElementById('user-status').appendChild(wbtn);
+    if (currentUser.restricted) {
+      if (banner) {
+        banner.style.display = 'block';
+        document.getElementById('restriction-msg').textContent = currentUser.restrictionMessage || 'Please contact support via chat.';
+      }
+      status.style.display = 'none';
+      const cars = document.getElementById('cars');
+      if (cars) { cars.style.opacity = '0.5'; cars.style.pointerEvents = 'none'; }
+    } else {
+      if (banner) banner.style.display = 'none';
+      status.style.display = 'block';
+      const cars = document.getElementById('cars');
+      if (cars) { cars.style.opacity = '1'; cars.style.pointerEvents = 'auto'; }
+      const stage = currentUser.stage || 1;
+      document.getElementById('current-stage').textContent = stage;
+      const prog = currentUser.stageProgress[stage] || 0;
+      const required = [0,30,20,15,1,1,1][stage] || 30;
+      const percent = Math.min(100, (prog / required) * 100);
+      document.getElementById('progress').style.width = percent + '%';
+      document.getElementById('progress-text').textContent = `Stage ${stage}: ${prog} / ${required}`;
+      document.getElementById('earnings-text').textContent = `Total earnings so far: $${currentUser.earnings || 0} (pending admin approval)`;
+      document.getElementById('next-stage-btn').style.display = (prog >= required && stage < 6) ? 'inline-block' : 'none';
     }
   } else {
     authNav.innerHTML = `<a href="#" onclick="showAuth('login')">Login</a>`;
     status.style.display = 'none';
+    if (banner) banner.style.display = 'none';
   }
 }
 
@@ -274,7 +282,7 @@ async function loadChat() {
           ${!isUser ? `<div style="width:32px;height:32px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:16px;">${avatar}</div>` : ''}
           <div style="max-width:70%;">
             ${label ? `<small style="opacity:0.7;display:block;margin-bottom:2px;">${label}</small>` : ''}
-            <span style="background:${bg};padding:8px 12px;border-radius:12px;display:inline-block;word-wrap:break-word;">${m.message}</span>
+            <span style="background:${bg};padding:8px 12px;border-radius:12px;display:inline-block;word-wrap:break-word;">${m.message}${m.file ? `<br><a href="${m.file}" target="_blank" style="color:#93c5fd;">📎 View file</a>` : ''}</span>
           </div>
           ${isUser ? `<div style="width:32px;height:32px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:16px;">${avatar}</div>` : ''}
         </div>`;
@@ -283,7 +291,26 @@ async function loadChat() {
   } catch(e) {}
 }
 
-async function sendChat() {
+async function uploadChatFile() {
+  const fileInput = document.getElementById('chat-file');
+  const file = fileInput.files[0];
+  if (!file) return alert('Select a file first');
+  if (file.size > 5 * 1024 * 1024) return alert('File too large (max 5MB)');
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1];
+    try {
+      await api('/api/chat/upload', { method: 'POST', body: JSON.stringify({
+        filename: file.name,
+        data: base64,
+        message: 'Shared a file: ' + file.name
+      })});
+      fileInput.value = '';
+      loadChat();
+    } catch (e) { alert(e.message); }
+  };
+  reader.readAsDataURL(file);
+}
   const input = document.getElementById('chat-input');
   const msg = input.value.trim();
   if (!msg) return;

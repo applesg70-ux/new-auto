@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,6 +20,7 @@ let db = {
   cars: [],
   activities: [],
   messages: [],
+  sessions: [],
   supportOnline: true,
   supportName: 'Customer Support',
   admin: {
@@ -129,13 +131,60 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// Simple in-memory sessions (for demo)
-const sessions = new Map();
-
 function getUserFromToken(token) {
-  const session = sessions.get(token);
+  if (!token) return null;
+  const session = db.sessions.find(s => s.token === token);
   if (!session) return null;
   return db.users.find(u => u.id === session.userId);
+}
+
+function createSession(userId) {
+  const token = generateToken();
+  db.sessions.push({ token, userId, created: Date.now() });
+  saveDB();
+  return token;
+}
+
+function destroySession(token) {
+  db.sessions = db.sessions.filter(s => s.token !== token);
+  saveDB();
+}
+
+function sendVerificationEmail(email, token, name) {
+  const apiKey = process.env.BREVO_API_KEY || process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    console.log('[Email] No API key. Verification link:', (process.env.SITE_URL || 'https://new-auto-gt53.onrender.com') + '/api/verify-email?token=' + token);
+    return;
+  }
+  const siteUrl = process.env.SITE_URL || 'https://new-auto-gt53.onrender.com';
+  const verifyLink = `${siteUrl}/api/verify-email?token=${token}`;
+  const isBrevo = !!process.env.BREVO_API_KEY;
+  const payload = isBrevo ? {
+    sender: { name: 'Automarin World Cars', email: process.env.SENDER_EMAIL || 'noreply@automarinworldcars.com' },
+    to: [{ email, name: name || email }],
+    subject: 'Verify your email – Automarin World Cars',
+    htmlContent: `<p>Hello ${name || 'there'},</p><p>Please verify your email:</p><p><a href="${verifyLink}" style="background:#3b82f6;color:white;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Email</a></p><p>Link: ${verifyLink}</p>`
+  } : {
+    personalizations: [{ to: [{ email }] }],
+    from: { email: process.env.SENDER_EMAIL || 'noreply@automarinworldcars.com', name: 'Automarin World Cars' },
+    subject: 'Verify your email – Automarin World Cars',
+    content: [{ type: 'text/html', value: `<p>Hello,</p><p>Verify your email: <a href="${verifyLink}">${verifyLink}</a></p>` }]
+  };
+  const options = isBrevo ? {
+    hostname: 'api.brevo.com', path: '/v3/smtp/email', method: 'POST',
+    headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
+  } : {
+    hostname: 'api.sendgrid.com', path: '/v3/mail/send', method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+  };
+  const reqMail = https.request(options, (res) => {
+    let data = '';
+    res.on('data', c => data += c);
+    res.on('end', () => console.log(res.statusCode < 300 ? 'Email sent to ' + email : 'Email failed: ' + res.statusCode + ' ' + data));
+  });
+  reqMail.on('error', e => console.error('Email error:', e));
+  reqMail.write(JSON.stringify(payload));
+  reqMail.end();
 }
 
 function parseBody(req) {
@@ -164,8 +213,15 @@ function serveStatic(req, res) {
   // Special case for admin
   if (cleanUrl === '/admin' || cleanUrl === '/admin/') cleanUrl = '/admin.html';
 
+  // Special case for uploads
+  if (cleanUrl.startsWith('/uploads/')) {
+    filePath = path.join(__dirname, cleanUrl);
+  }
+
   // Try public folder first
-  let filePath = path.join(PUBLIC_DIR, cleanUrl);
+  if (!filePath || !fs.existsSync(filePath)) {
+    filePath = path.join(PUBLIC_DIR, cleanUrl);
+  }
   if (!filePath.startsWith(PUBLIC_DIR) && !filePath.startsWith(__dirname)) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
@@ -226,6 +282,10 @@ const server = http.createServer(async (req, res) => {
 
     // ========== AUTH ==========
     if (pathname === '/api/register' && method === 'POST') {
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      if (!checkRateLimit('reg-' + ip, 3, 60 * 60 * 1000)) {
+        return sendJSON(res, 429, { error: 'Too many registration attempts. Try again later.' });
+      }
       const { username, name, email, password, phone } = body;
       if (!username || !email || !password || !phone) return sendJSON(res, 400, { error: 'Username, email, password and phone number are required' });
       if (db.users.find(u => u.email === email || u.username === username)) return sendJSON(res, 400, { error: 'Email or username already registered' });
@@ -247,29 +307,58 @@ const server = http.createServer(async (req, res) => {
         pendingRewards: [],
         wallet: null,
         passwordResetRequest: null,
+        emailVerified: false,
+        verificationToken: crypto.randomBytes(32).toString('hex'),
+        restricted: false,
+        restrictionMessage: '',
         createdAt: new Date().toISOString(),
         lastActivity: new Date().toISOString()
       };
       db.users.push(user);
       saveDB();
-      return sendJSON(res, 201, { message: 'Registration submitted. Awaiting admin approval.' });
+      // Send verification email
+      sendVerificationEmail(email, user.verificationToken, name || username);
+      return sendJSON(res, 201, { 
+        message: 'Registration submitted. Please check your email to verify your account. Admin approval is also required before you can log in.'
+      });
+    }
+
+    if (pathname === '/api/verify-email' && method === 'GET') {
+      const token = parsed.query.token;
+      const user = db.users.find(u => u.verificationToken === token);
+      if (!user) return sendJSON(res, 400, { error: 'Invalid verification token' });
+      user.emailVerified = true;
+      user.verificationToken = null;
+      saveDB();
+      return sendJSON(res, 200, { message: 'Email verified successfully. You can now log in after admin approval.' });
     }
 
     if (pathname === '/api/login' && method === 'POST') {
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      if (!checkRateLimit('login-' + ip, 10, 15 * 60 * 1000)) {
+        return sendJSON(res, 429, { error: 'Too many login attempts. Try again in 15 minutes.' });
+      }
       const { email, password, username } = body;
       const identifier = email || username;
       const user = db.users.find(u => u.email === identifier || u.username === identifier);
       if (!user || !verifyPassword(password, user.passwordHash)) {
         return sendJSON(res, 401, { error: 'Invalid credentials' });
       }
+      if (!user.emailVerified) {
+        return sendJSON(res, 403, { error: 'Please verify your email first' });
+      }
       if (!user.approved) {
         return sendJSON(res, 403, { error: 'Account pending admin approval' });
       }
-      const token = generateToken();
-      sessions.set(token, { userId: user.id, created: Date.now() });
+      const token = createSession(user.id);
       user.lastActivity = new Date().toISOString();
       saveDB();
-      return sendJSON(res, 200, { token, user: { id: user.id, username: user.username, name: user.name, email: user.email, phone: user.phone, stage: user.stage, stageProgress: user.stageProgress, earnings: user.earnings, pendingRewards: user.pendingRewards, kycVerified: user.kycVerified, isVIP: user.isVIP } });
+      return sendJSON(res, 200, { token, user: { id: user.id, username: user.username, name: user.name, email: user.email, phone: user.phone, stage: user.stage, stageProgress: user.stageProgress, earnings: user.earnings, pendingRewards: user.pendingRewards, kycVerified: user.kycVerified, isVIP: user.isVIP, restricted: user.restricted, restrictionMessage: user.restrictionMessage } });
+    }
+
+    if (pathname === '/api/logout' && method === 'POST') {
+      if (token) destroySession(token);
+      return sendJSON(res, 200, { success: true });
     }
 
     if (pathname === '/api/me' && method === 'GET') {
@@ -605,8 +694,51 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { success: true });
     }
 
-    // Set VIP
-    if (pathname === '/api/admin/set-vip' && method === 'POST') {
+    // Admin mark email verified
+    if (pathname === '/api/admin/verify-email' && method === 'POST') {
+      if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
+      const { userId } = body;
+      const user = db.users.find(u => u.id === userId);
+      if (!user) return sendJSON(res, 404, { error: 'User not found' });
+      user.emailVerified = true;
+      user.verificationToken = null;
+      saveDB();
+      return sendJSON(res, 200, { success: true });
+    }
+    if (pathname === '/api/admin/restrict' && method === 'POST') {
+      if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
+      const { userId, restricted, message } = body;
+      const user = db.users.find(u => u.id === userId);
+      if (!user) return sendJSON(res, 404, { error: 'User not found' });
+      user.restricted = !!restricted;
+      user.restrictionMessage = message || (restricted ? 'Your account has been restricted. Please contact customer support via chat.' : '');
+      saveDB();
+      return sendJSON(res, 200, { success: true });
+    }
+
+    // Chat file upload (base64 for simplicity on pure Node)
+    if (pathname === '/api/chat/upload' && method === 'POST') {
+      if (!currentUser) return sendJSON(res, 401, { error: 'Unauthorized' });
+      const { filename, data, message } = body;
+      if (!filename || !data) return sendJSON(res, 400, { error: 'File data required' });
+      const uploadDir = path.join(__dirname, 'uploads');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const safeName = Date.now() + '-' + filename.replace(/[^a-zA-Z0-9.\-_]/g, '');
+      const filePath = path.join(uploadDir, safeName);
+      fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+      db.messages.push({
+        id: crypto.randomUUID(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        message: message || `Uploaded file: ${filename}`,
+        from: 'user',
+        file: `/uploads/${safeName}`,
+        time: new Date().toISOString(),
+        read: false
+      });
+      saveDB();
+      return sendJSON(res, 200, { success: true, file: `/uploads/${safeName}` });
+    }
       if (!isAdmin) return sendJSON(res, 401, { error: 'Admin only' });
       const { userId, isVIP } = body;
       const user = db.users.find(u => u.id === userId);

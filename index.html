@@ -9,6 +9,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
+    <div id="restriction-banner" style="display:none;background:#ef4444;color:white;padding:12px;text-align:center;font-weight:500;">
+        Your account is restricted. <span id="restriction-msg"></span> Please use the chat button to contact support.
+    </div>
+
     <nav class="navbar">
         <div class="nav-container">
             <div class="logo"><i class="fas fa-car"></i> Automarin <span>World Cars</span></div>
@@ -332,7 +336,11 @@
             <p style="font-size:0.85rem;color:#f59e0b;">Contact customer support for your first withdrawal or any help. We are online!</p>
             <div id="chat-messages" style="flex:1;overflow-y:auto;background:#0f172a;padding:10px;border-radius:8px;margin:10px 0;"></div>
             <input id="chat-input" placeholder="Type your message..." style="margin:0;">
-            <button onclick="sendChat()">Send</button>
+            <input type="file" id="chat-file" accept="image/*,.pdf,.doc,.docx,.txt" style="margin:5px 0;font-size:0.85rem;color:#94a3b8;">
+            <div style="display:flex;gap:5px;">
+                <button onclick="sendChat()" style="flex:1;">Send</button>
+                <button onclick="uploadChatFile()" style="flex:1;background:#10b981;">Upload File</button>
+            </div>
         </div>
     </div>
 
